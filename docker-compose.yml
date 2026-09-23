@@ -2,18 +2,25 @@ services:
   postgres:
     image: postgres:16
     container_name: vocational-postgres
+    restart: always
     environment:
-      - POSTGRES_USER=vocational_user
-      - POSTGRES_PASSWORD=vocational_pass
-      - POSTGRES_DB=vocational_ai
+      POSTGRES_USER: vocational_user
+      POSTGRES_PASSWORD: vocational_pass
+      POSTGRES_DB: vocational_ai
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vocational_user -d vocational_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./backend
     container_name: vocational-backend
+    restart: always
     ports:
       - "8000:8000"
     env_file:
@@ -21,9 +28,21 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://vocational_user:vocational_pass@postgres:5432/vocational_ai
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - ./backend/app:/app/app
+
+  frontend:
+    build: ./frontend
+    container_name: vocational-frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
